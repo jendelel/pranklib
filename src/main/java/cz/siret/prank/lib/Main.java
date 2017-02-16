@@ -1,10 +1,9 @@
 package cz.siret.prank.lib;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -31,31 +30,43 @@ public class Main {
 
         Path dir = Paths.get("e:/School/MFF/Projects/Prank2Web/Experiments" +
                 "/analyze_binding-residues_chen11/");
-        for (String origin : orgins) {
-            List<ConservationComparison> comparisons = new ArrayList<>(orgins.length);
-            for (String file : files) {
-                File indices = dir.resolve(file + ".pdb_binding-residues.txt")
-                        .toFile();
-                File score = dir.resolve(String.format("%s.pdb.%s.hom.gz", file, origin)).toFile();
-                File pdb = dir.resolve(file + ".pdb").toFile();
-                try {
-                    ConservationComparison comparison =
-                            ConservationComparison.fromFiles(pdb, score, origin, indices);
-                    System.out.println(comparison.toString());
-                    comparisons.add(comparison);
-                } catch (IOException e) {
-                    e.printStackTrace();
+        File result = dir.resolve("results.txt").toFile();
+        try (PrintWriter output = new PrintWriter(result)) {
+            for (String origin : orgins) {
+                List<ConservationComparison> comparisons = new ArrayList<>(orgins.length);
+                for (String file : files) {
+                    File indices = dir.resolve(file + ".pdb_binding-residues.txt")
+                            .toFile();
+                    File score = dir.resolve(String.format("%s.pdb.%s.hom.gz", file, origin))
+                            .toFile();
+                    File pdb = dir.resolve(file + ".pdb").toFile();
+                    try {
+                        ConservationComparison comparison =
+                                ConservationComparison.fromFiles(pdb, score, origin, indices);
+//                        output.println(comparison.toString());
+                        System.out.println(comparison.toString());
+                        comparisons.add(comparison);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
+                double[] proteinScores = comparisons.stream()
+                        .map(ConservationComparison::getProteinScores)
+                        .flatMapToDouble(Arrays::stream).toArray();
+                double[] ligandScores = comparisons.stream()
+                        .map(ConservationComparison::getLigandScores)
+                        .flatMapToDouble(Arrays::stream).toArray();
+                ConservationComparison all = new ConservationComparison("all", origin,
+                        proteinScores, ligandScores);
+
+//                output.println(all.toString());
+                System.out.println(all.toString());
+                output.println(origin);
+                output.println(Arrays.toString(all.getProteinScores()));
+                output.println(Arrays.toString(all.getLigandScores()));
             }
-            double[] proteinScores = comparisons.stream()
-                    .map(ConservationComparison::getProteinScores)
-                    .flatMapToDouble(Arrays::stream).toArray();
-            double[] ligandScores = comparisons.stream()
-                    .map(ConservationComparison::getLigandScores)
-                    .flatMapToDouble(Arrays::stream).toArray();
-            ConservationComparison all = new ConservationComparison("all", origin,
-                    proteinScores, ligandScores);
-            System.out.println(all.toString());
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
         }
     }
 }
