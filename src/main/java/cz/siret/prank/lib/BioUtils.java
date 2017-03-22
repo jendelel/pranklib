@@ -17,28 +17,48 @@ public class BioUtils {
         return pdbToFasta(pdbFile, null);
     }
 
-    public static String pdbToFasta(File pdbFile, String chainId) throws IOException, StructureException {
+    public static String chainToFasta(Chain chain, String header) {
+        StringBuilder result = new StringBuilder();
+        String seq = chain.getAtomSequence().trim();
+        if (seq.length() == 0) return null;
+        // Print the header like this: >4X09:A
+        result.append(header).append(chain.getChainID()).append('\n');
+        // Print the chain sequence and wrap lines at 80 characters
+        for (int i = 0; i < seq.length(); i++) {
+            if (i != 0 && i % 80 == 0) result.append('\n');
+            result.append(seq.charAt(i));
+        }
+        return result.toString();
+    }
+
+    public static String pdbToFasta(File pdbFile, String chainId) throws IOException,
+            StructureException {
         PDBFileReader pdbReader = new PDBFileReader();
         boolean isGzipped = pdbFile.getName().endsWith(".gz");
         try (InputStream inputStream = isGzipped ?
                 new GZIPInputStream(new FileInputStream(pdbFile)) :
                 new FileInputStream(pdbFile)) {
             Structure structure = pdbReader.getStructure(inputStream);
-
             StringBuilder output = new StringBuilder();
             String header = ">" + structure.getPDBHeader().getIdCode() + ":";
-            Chain chain = chainId == null ?
-                    structure.getChains().get(0) :
-                    structure.getChainByPDB(chainId);
-            // Print the header like this: >4X09:A
-            output.append(header).append(chain.getChainID()).append('\n');
-            // Print the chain sequence and wrap lines at 80 characters
-            String seq = chain.getAtomSequence();
-            for (int i = 0; i < seq.length(); i++) {
-                if (i != 0 && i % 80 == 0) output.append('\n');
-                output.append(seq.charAt(i));
+            if (chainId == null) {
+                for (Chain chain : structure.getChains()) {
+                    String chainFasta = chainToFasta(chain, header);
+                    if (chainFasta != null) {
+                        output.append(chainFasta);
+                        output.append('\n');
+                    }
+                }
+            } else {
+                Chain chain = chainId == null ?
+                        structure.getChains().get(0) :
+                        structure.getChainByPDB(chainId);
+                String chainFasta = chainToFasta(chain, header);
+                if (chainFasta != null) {
+                    output.append(chainFasta);
+                    output.append('\n');
+                }
             }
-            output.append('\n');
             return output.toString();
         }
     }

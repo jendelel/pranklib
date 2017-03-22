@@ -18,6 +18,8 @@ public class Pocket implements Serializable {
     private float centerZ;
     private Integer[] residueIds;
     private Integer[] surfAtomIds;
+    private ConservationScore conservationScore;
+    private boolean truePocket;
 
     public String getName() {
         return name;
@@ -99,8 +101,29 @@ public class Pocket implements Serializable {
         this.surfAtomIds = surfAtomIds;
     }
 
+    public ConservationScore getConservationScore() {
+        return conservationScore;
+    }
+    public void setConservationScore(ConservationScore conservationScore) {
+        this.conservationScore = conservationScore;
+    }
 
-    public static List<Pocket> parseCSVPrediction(InputStream inputStream) {
+    public double getConservationAvg() {
+        return Arrays.stream(residueIds).mapToDouble(i->conservationScore.getScoreForResidue(i))
+                .average().getAsDouble();
+    }
+
+    public boolean isTruePocket() {
+        return truePocket;
+    }
+
+    public void setTruePocket(boolean truePocket) {
+        this.truePocket = truePocket;
+    }
+
+    public static List<Pocket> parseCSVPrediction(InputStream inputStream,
+                                                  List<Integer> truePockets,
+                                                  ConservationScore conservationScores) {
         // name,rank,score,connolly_points,surf_atoms,center_x,center_y,center_z,residue_ids,
         // surf_atom_ids
         Scanner scanner = new Scanner(inputStream);
@@ -121,8 +144,20 @@ public class Pocket implements Serializable {
                     .map((s) -> Integer.parseInt(s)).toArray(Integer[]::new));
             p.setSurfAtomIds(Arrays.stream(tokens[9].split(" "))
                     .map((s) -> Integer.parseInt(s)).toArray(Integer[]::new));
+            if (conservationScores != null) {
+                p.conservationScore = conservationScores;
+            }
             res.add(p);
         }
+
+        if (truePockets != null) {
+            for (int index : truePockets) {
+                if (index != -1) {
+                    res.get(index - 1).setTruePocket(true);
+                }
+            }
+        }
+
         return res;
     }
 }
