@@ -8,18 +8,21 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+
+import cz.siret.prank.lib.utils.BioUtils;
+import cz.siret.prank.lib.utils.Tuple2;
 
 public class Main {
 
@@ -27,8 +30,8 @@ public class Main {
         try {
             if (args.length == 0) {
                 Path dir = Paths.get("e:/School/MFF/Projects/Prank2Web/Experiments" +
-                        "/newChen11/");
-                analyzeConservation(dir, "swiss90");
+                        "/ConCavityData/");
+                analyzeConservation(dir, "hssp", ConservationScore.ScoreFormat.ConCavityFormat);
                 return;
             }
             switch (args[0].toLowerCase()) {
@@ -39,18 +42,40 @@ public class Main {
                         e.printStackTrace();
                     }
                     break;
+                case "pickscores":
+                    try {
+                        File directory = (new File(args[1]));
+                        if (directory.exists() && directory.isDirectory()) {
+                            FilenameFilter filter = (File dir, String name) -> {
+                                if (name.endsWith(".pdb")) {
+                                    return true;
+                                }
+                                return false;
+                            };
+                            for (Tuple2<File, String> f : ConservationScore.pickScoresForPDBs(
+                                    directory.listFiles(filter))) {
+                                System.out.printf("%s %s\n", f.getItem1().getName(), f.getItem2());
+                            }
+                        }
+                    } catch (StructureException e) {
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private static ConservationScore loadConservationScore(File pdbFile, Function<String, File> scoreFnc) throws
-            IOException {
+    private static ConservationScore loadConservationScore(File pdbFile,
+                                                           Function<String, File> scoreFnc,
+                                                           ConservationScore.ScoreFormat format)
+            throws IOException {
         try (InputStream pdbIn = new FileInputStream(pdbFile)) {
             PDBFileReader reader = new PDBFileReader();
             Structure s = reader.getStructure(pdbIn);
-            return ConservationScore.fromFiles(s, scoreFnc, ConservationScore.ScoreFormat.JSDFormat);
+            return ConservationScore.fromFiles(s, scoreFnc, format);
         }
     }
 
@@ -81,13 +106,17 @@ public class Main {
         return result;
     }
 
-    private static void analyzeConservation(Path dir, String origin) throws IOException {
+    private static void analyzeConservation(Path dir, String origin,
+                                            ConservationScore.ScoreFormat format) throws
+            IOException {
         Map<String, List<Integer>> datasetStats = loadDatasetStatistics(
                 dir.resolve("ranks_rescored.dca4.csv").toFile());
         List<Integer> truePocketPositionsConservation = new ArrayList<>();
         List<Integer> truePocketPositionsPrank = new ArrayList<>();
+        List<Integer> truePocketPositionsCombi = new ArrayList<>();
         List<Integer> falsePocketPositionsConservation = new ArrayList<>();
         List<Integer> falsePocketPositionsPrank = new ArrayList<>();
+        List<Integer> falsePocketPositionsCombi = new ArrayList<>();
         List<Integer> numberOfPockets = new ArrayList<>();
 
         List<Double> truePocketConservationAvg = new ArrayList<>();
@@ -107,21 +136,31 @@ public class Main {
                     if (pdb.getName().endsWith(".pdb")) {
                         String nameBase = pdb.getName().substring(0, pdb.getName().length() - 4);
                         File indices = dir.resolve(nameBase + ".pdb_binding-residues.txt").toFile();
-                        //Function<String, File> scoreFnc = chainId -> dir.resolve(String.format
-                        //        ("%s_%s.scores", nameBase, chainId)).toFile();
-                        Function<String, File> scoreFnc = chainId -> dir.resolve(String.format
-                                ("%s.scores", nameBase)).toFile();
+
+                        Function<String, File> scoreFnc = format == ConservationScore.ScoreFormat
+                                .ConCavityFormat ?
+                                chainId -> dir.resolve(String.format
+                                        ("%s_%s.scores", nameBase, chainId)).toFile() :
+                                chainId -> dir.resolve(String.format
+                                        ("%s.scores", nameBase)).toFile();
+
                         File predictions = dir.resolve(String.format("%s.pdb_predictions.csv",
                                 nameBase)).toFile();
                         try {
-                            ConservationScore score = loadConservationScore(pdb, scoreFnc);
+                            ConservationScore score = loadConservationScore(pdb, scoreFnc, format);
                             ConservationComparison comparison =
-                                    ConservationComparison.fromFiles(pdb.getName(), score,
+                                    ConservationComparison.fromFiles(pdb, score,
                                             origin, indices);
                             List<Pocket> pockets = Pocket.parseCSVPrediction(
                                     new FileInputStream(predictions),
                                     datasetStats.get(pdb.getName()),
                                     score);
+
+                            for (Pocket pocket : pockets) {
+                                scores.add((double) pocket.getScore());
+                                conservationScore.add(pocket.getConservationAvg());
+                                pocketIsTrue.add(pocket.isTruePocket());
+                            }
 
                             for (int i = 0; i < pockets.size(); i++) {
                                 if (pockets.get(i).isTruePocket()) {
@@ -132,7 +171,8 @@ public class Main {
                                 }
                             }
 
-                            pockets.sort(Comparator.comparing(Pocket::getConservationAvg).reversed());
+                            pockets.sort(Comparator.comparing(Pocket::getConservationAvg)
+                                    .reversed());
                             for (int i = 0; i < pockets.size(); i++) {
                                 if (pockets.get(i).isTruePocket()) {
                                     truePocketPositionsConservation.add(i);
@@ -145,6 +185,18 @@ public class Main {
                                             .getConservationAvg());
                                 }
                             }
+
+                            pockets.sort(Comparator.comparing(Pocket::getCombiningScore).reversed
+                                    ());
+                            for (int i = 0; i < pockets.size(); i++) {
+                                if (pockets.get(i).isTruePocket()) {
+                                    truePocketPositionsCombi.add(i);
+                                    System.out.printf("combi: %d\n", i);
+                                } else {
+                                    falsePocketPositionsCombi.add(i);
+                                }
+                            }
+
                             numberOfPockets.add(pockets.size());
 
                             System.out.println(comparison.toString());
@@ -166,11 +218,17 @@ public class Main {
                 System.out.printf("True pocket conservation rank avg: %f/%f\n",
                         truePocketPositionsConservation.stream().mapToInt(Integer::intValue)
                                 .average().getAsDouble(), avgNumberOfPockets);
+                System.out.printf("True pocket combi rank avg: %f/%f\n",
+                        truePocketPositionsCombi.stream().mapToInt(Integer::intValue)
+                                .average().getAsDouble(), avgNumberOfPockets);
                 System.out.printf("False pocket prank rank avg: %f/%f\n",
                         falsePocketPositionsPrank.stream().mapToInt(Integer::intValue)
                                 .average().getAsDouble(), avgNumberOfPockets);
                 System.out.printf("False pocket conservation rank avg: %f/%f\n",
                         falsePocketPositionsConservation.stream().mapToInt(Integer::intValue)
+                                .average().getAsDouble(), avgNumberOfPockets);
+                System.out.printf("False pocket combi rank avg: %f/%f\n",
+                        falsePocketPositionsCombi.stream().mapToInt(Integer::intValue)
                                 .average().getAsDouble(), avgNumberOfPockets);
 
                 System.out.printf("\n\nTrue pocket conservation avg: %f\n",
@@ -185,7 +243,7 @@ public class Main {
 //                allRaw.println(trim.apply(Arrays.toString(all.getNonLigandScores())));
 //                allRaw.println(trim.apply(Arrays.toString(all.getLigandScores())));
 
-                for (int i=0; i<pocketIsTrue.size(); i++) {
+                for (int i = 0; i < pocketIsTrue.size(); i++) {
                     allRaw.printf("%f,%f,%f\n", scores.get(i), conservationScore.get(i),
                             pocketIsTrue.get(i) ? 1.0 : 0.0);
                 }

@@ -1,4 +1,4 @@
-package cz.siret.prank.lib;
+package cz.siret.prank.lib.utils;
 
 import org.biojava.nbio.structure.Chain;
 import org.biojava.nbio.structure.Structure;
@@ -77,5 +77,6 @@ public class BioUtils {
             }
         }
     }
+
 
 }

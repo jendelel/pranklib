@@ -2,6 +2,10 @@ package cz.siret.prank.lib;
 
 import org.apache.commons.math3.exception.InsufficientDataException;
 import org.apache.commons.math3.stat.inference.KolmogorovSmirnovTest;
+import org.biojava.nbio.structure.GroupType;
+import org.biojava.nbio.structure.ResidueNumber;
+import org.biojava.nbio.structure.Structure;
+import org.biojava.nbio.structure.io.PDBFileReader;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -11,20 +15,25 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.stream.DoubleStream;
 
+import cz.siret.prank.lib.utils.Utils;
+
 public class ConservationComparison implements Serializable {
     private String fileName;
     private String scoreOrigin;
     private ConservationScore conservationScore;
-    private int[] ligandIndices;
+    private ResidueNumber[] ligandIndices;
+    private Structure protein;
 
     public ConservationComparison(String fileName,
                                   String scoreOrigin,
                                   ConservationScore conservationScore,
-                                  int[] ligandIndices) {
+                                  ResidueNumber[] ligandIndices,
+                                  Structure protein) {
         this.fileName = fileName;
         this.scoreOrigin = scoreOrigin;
         this.conservationScore = conservationScore;
         this.ligandIndices = ligandIndices;
+        this.protein = protein;
     }
 
     public String getFileName() {
@@ -57,23 +66,27 @@ public class ConservationComparison implements Serializable {
     }
 
     public double[] getNonLigandScores() {
-        Integer[] proteinResNums = conservationScore.getScoreMap().keySet().stream().sorted()
-                .toArray(Integer[]::new);
-        return Arrays.stream(proteinResNums).filter(
-                resNum -> Arrays.binarySearch(ligandIndices, resNum) >= 0)
-                .mapToDouble(resNum -> conservationScore.getScoreForResidue(resNum)).toArray();
+        return protein.getChains().stream()
+                .flatMap(chain -> chain.getAtomGroups(GroupType.AMINOACID).stream()
+                        .map(aa -> aa.getResidueNumber()))
+                .filter(a -> Arrays.stream(ligandIndices).anyMatch(
+                        b -> ResidueNumberWrapper.equalsPositional(a,b)))
+                .mapToDouble(resNum -> conservationScore.getScoreForResidue(resNum))
+                .toArray();
     }
 
     public double[] getProteinScores() {
-        return conservationScore.getScoreMap().values().stream()
-                .mapToDouble(Double::doubleValue).toArray();
+        return protein.getChains().stream()
+                .flatMap(chain -> chain.getAtomGroups(GroupType.AMINOACID).stream())
+                .mapToDouble(aa -> conservationScore.getScoreForResidue(aa.getResidueNumber()))
+                .toArray();
     }
 
-    public int[] getLigandIndices() {
+    public ResidueNumber[] getLigandIndices() {
         return ligandIndices;
     }
 
-    public void setLigandIndices(int[] ligandIndices) {
+    public void setLigandIndices(ResidueNumber[] ligandIndices) {
         this.ligandIndices = ligandIndices;
     }
 
@@ -132,18 +145,24 @@ public class ConservationComparison implements Serializable {
 //    }
 
 
-    public static ConservationComparison fromFiles(String fileName,
+    public static ConservationComparison fromFiles(File pdbFile,
                                                    ConservationScore conservationScore,
                                                    String org,
-                                                   File lingadIndices) throws IOException {
-        try (InputStream indicesIn = new FileInputStream(lingadIndices)) {
-            String content = Utils.convertStreamToString(indicesIn);
-            String[] tokens = content.split("\n");
-            int[] ligandIndices = Arrays.stream(tokens)
-                    .mapToInt((str) -> Integer.parseInt(str)).toArray();
+                                                   File lingadIndices) throws
+            IOException {
+        try (InputStream pdbIn = new FileInputStream(pdbFile)) {
+            PDBFileReader reader = new PDBFileReader();
+            Structure s = reader.getStructure(pdbIn);
 
-            return new ConservationComparison(fileName, org,
-                    conservationScore, ligandIndices);
+            try (InputStream indicesIn = new FileInputStream(lingadIndices)) {
+                String content = Utils.convertStreamToString(indicesIn);
+                String[] tokens = content.split("\n");
+                ResidueNumber[] ligandIndices = Arrays.stream(tokens)
+                        .map((str) -> ResidueNumber.fromString(str)).toArray(ResidueNumber[]::new);
+
+                return new ConservationComparison(pdbFile.getName(), org,
+                        conservationScore, ligandIndices, s);
+            }
         }
     }
 

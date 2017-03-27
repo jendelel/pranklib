@@ -1,4 +1,4 @@
-package cz.siret.prank.lib;
+package cz.siret.prank.lib.utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
