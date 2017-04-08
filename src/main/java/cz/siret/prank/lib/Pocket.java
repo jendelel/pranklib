@@ -1,14 +1,11 @@
 package cz.siret.prank.lib;
 
-import org.biojava.nbio.structure.ResidueNumber;
-
 import java.io.InputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
-import java.util.function.Function;
 
 public class Pocket implements Serializable {
     private String name;
@@ -19,10 +16,8 @@ public class Pocket implements Serializable {
     private float centerX;
     private float centerY;
     private float centerZ;
-    private ResidueNumber[] residueIds;
+    private Integer[] residueIds;
     private Integer[] surfAtomIds;
-    private ConservationScore conservationScores;
-    private boolean truePocket;
 
     public String getName() {
         return name;
@@ -88,11 +83,11 @@ public class Pocket implements Serializable {
         this.centerZ = centerZ;
     }
 
-    public ResidueNumber[] getResidueIds() {
+    public Integer[] getResidueIds() {
         return residueIds;
     }
 
-    public void setResidueIds(ResidueNumber[] residueIds) {
+    public void setResidueIds(Integer[] residueIds) {
         this.residueIds = residueIds;
     }
 
@@ -104,39 +99,8 @@ public class Pocket implements Serializable {
         this.surfAtomIds = surfAtomIds;
     }
 
-    public ConservationScore getConservationScores() {
-        return conservationScores;
-    }
-    public void setConservationScores(ConservationScore conservationScores) {
-        this.conservationScores = conservationScores;
-    }
 
-    public double getConservationAvg() {
-        return Arrays.stream(residueIds).mapToDouble(i-> conservationScores.getScoreForResidue(i))
-                .average().getAsDouble();
-    }
-
-    private Function<Double, Double> sigmoid = x -> 1.0/(1.0+Math.exp(-x));
-    public double getCombiningScore() {
-        double a = -0.118042;
-        double b = 0.667817;
-        double c= -0.9389;
-        double d = -0.0680766;
-//        return getScore() * getConservationAvg();
-        return sigmoid.apply((c * getConservationAvg() + d) * (a *getScore() + b));
-    }
-
-    public boolean isTruePocket() {
-        return truePocket;
-    }
-
-    public void setTruePocket(boolean truePocket) {
-        this.truePocket = truePocket;
-    }
-
-    public static List<Pocket> parseCSVPrediction(InputStream inputStream,
-                                                  List<Integer> truePockets,
-                                                  ConservationScore conservationScores) {
+    public static List<Pocket> parseCSVPrediction(InputStream inputStream) {
         // name,rank,score,connolly_points,surf_atoms,center_x,center_y,center_z,residue_ids,
         // surf_atom_ids
         Scanner scanner = new Scanner(inputStream);
@@ -154,23 +118,11 @@ public class Pocket implements Serializable {
             p.setCenterY(Float.parseFloat(tokens[6]));
             p.setCenterZ(Float.parseFloat(tokens[7]));
             p.setResidueIds(Arrays.stream(tokens[8].split(" "))
-                    .map((s) -> ResidueNumber.fromString(s)).toArray(ResidueNumber[]::new));
+                    .map((s) -> Integer.parseInt(s)).toArray(Integer[]::new));
             p.setSurfAtomIds(Arrays.stream(tokens[9].split(" "))
                     .map((s) -> Integer.parseInt(s)).toArray(Integer[]::new));
-            if (conservationScores != null) {
-                p.conservationScores = conservationScores;
-            }
             res.add(p);
         }
-
-        if (truePockets != null) {
-            for (int index : truePockets) {
-                if (index != -1) {
-                    res.get(index - 1).setTruePocket(true);
-                }
-            }
-        }
-
         return res;
     }
 }

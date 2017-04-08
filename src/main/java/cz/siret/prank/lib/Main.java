@@ -30,8 +30,8 @@ public class Main {
         try {
             if (args.length == 0) {
                 Path dir = Paths.get("e:/School/MFF/Projects/Prank2Web/Experiments" +
-                        "/ConCavityData/");
-                analyzeConservation(dir, "hssp", ConservationScore.ScoreFormat.ConCavityFormat);
+                        "/joined/");
+                //analyzeConservation(dir, "hssp", ConservationScore.ScoreFormat.JSDFormat);
                 return;
             }
             switch (args[0].toLowerCase()) {
@@ -54,6 +54,9 @@ public class Main {
                             };
                             for (Tuple2<File, String> f : ConservationScore.pickScoresForPDBs(
                                     directory.listFiles(filter))) {
+                                if (f == null || f.getItem1() == null || f.getItem2() == null) {
+                                    int debug = 5;
+                                }
                                 System.out.printf("%s %s\n", f.getItem1().getName(), f.getItem2());
                             }
                         }
@@ -105,7 +108,7 @@ public class Main {
         }
         return result;
     }
-
+/*
     private static void analyzeConservation(Path dir, String origin,
                                             ConservationScore.ScoreFormat format) throws
             IOException {
@@ -142,7 +145,7 @@ public class Main {
                                 chainId -> dir.resolve(String.format
                                         ("%s_%s.scores", nameBase, chainId)).toFile() :
                                 chainId -> dir.resolve(String.format
-                                        ("%s.scores", nameBase)).toFile();
+                                        ("%s%s.scores", nameBase, chainId)).toFile();
 
                         File predictions = dir.resolve(String.format("%s.pdb_predictions.csv",
                                 nameBase)).toFile();
@@ -250,4 +253,5 @@ public class Main {
             }
         }
     }
+    */
 }
