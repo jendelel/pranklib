@@ -150,11 +150,11 @@ public class ConservationComparison implements Serializable {
                                                    String org,
                                                    File lingadIndices) throws
             IOException {
-        try (InputStream pdbIn = new FileInputStream(pdbFile)) {
+        try (InputStream pdbIn = Utils.readFile(pdbFile)) {
             PDBFileReader reader = new PDBFileReader();
             Structure s = reader.getStructure(pdbIn);
 
-            try (InputStream indicesIn = new FileInputStream(lingadIndices)) {
+            try (InputStream indicesIn = Utils.readFile(lingadIndices)) {
                 String content = Utils.convertStreamToString(indicesIn);
                 String[] tokens = content.split("\n");
                 ResidueNumber[] ligandIndices = Arrays.stream(tokens)

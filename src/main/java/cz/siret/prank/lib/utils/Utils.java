@@ -5,12 +5,14 @@ import org.slf4j.LoggerFactory;
 
 import java.awt.Color;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.util.Scanner;
+import java.util.zip.GZIPInputStream;
 
 
 public class Utils {
@@ -22,6 +24,14 @@ public class Utils {
         while (len != -1) {
             out.write(buffer, 0, len);
             len = in.read(buffer);
+        }
+    }
+
+    public static InputStream readFile(File file) throws IOException {
+        if (file.getName().endsWith(".gz")) {
+            return new GZIPInputStream(new FileInputStream(file));
+        } else {
+            return new FileInputStream(file);
         }
     }
 

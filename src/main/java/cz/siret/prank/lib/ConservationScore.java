@@ -1,7 +1,5 @@
 package cz.siret.prank.lib;
 
-import com.google.gson.Gson;
-
 import com.univocity.parsers.tsv.TsvParser;
 import com.univocity.parsers.tsv.TsvParserSettings;
 
@@ -11,17 +9,12 @@ import org.biojava.nbio.structure.GroupType;
 import org.biojava.nbio.structure.ResidueNumber;
 import org.biojava.nbio.structure.Structure;
 import org.biojava.nbio.structure.StructureException;
-import org.biojava.nbio.structure.io.PDBFileReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.Serializable;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -32,8 +25,10 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import cz.siret.prank.lib.utils.BioUtils;
 import cz.siret.prank.lib.utils.Tuple;
 import cz.siret.prank.lib.utils.Tuple2;
+import cz.siret.prank.lib.utils.Tuple3;
 import cz.siret.prank.lib.utils.Utils;
 
 public class ConservationScore implements Serializable {
@@ -46,52 +41,66 @@ public class ConservationScore implements Serializable {
 
     public static List<Tuple2<File, String>> pickScoresForPDBs(File[] files)
             throws IOException, StructureException {
-        PDBFileReader reader = new PDBFileReader();
         List<Tuple2<File, String>> scoreFiles = new ArrayList<>(files.length);
         for (File pdbFile : files) {
-            try (InputStream pdbIn = new FileInputStream(pdbFile)) {
-                Structure s = reader.getStructure(pdbIn);
-                for (Chain chain : s.getChains()) {
-                    // Skip non-protein chains.
-                    if (chain.getAtomGroups(GroupType.AMINOACID).size() <= 0) continue;
-                    // Try to find score for this chain.
-                    String nameBase = pdbFile.getName()
-                            .substring(0, pdbFile.getName().length() - 4);
-                    Path parentDir = Paths.get(pdbFile.getParent());
-                    String chainId = chain.getChainID().trim().isEmpty() ? "A" : chain.getChainID();
-                    File scoreFile = parentDir.
-                            resolve(nameBase + chainId.toUpperCase() + ".scores").toFile();
-                    if (scoreFile.exists()) {
-                        scoreFiles.add(Tuple.create(scoreFile, scoreFile.getName()));
-                        continue;
-                    }
-                    // Fallback case. Try all chains and pick the one with longest LCS.
-                    File[] possibleScoreFiles = parentDir.toFile().listFiles(
-                            (File dir, String name) -> {
-                                if (name.startsWith(nameBase) && name.endsWith(".scores")) {
-                                    return true;
-                                }
-                                return false;
-                            });
-                    int max = -1;
-                    File newScoreFile = null;
-                    for (File possibleScoreFile : possibleScoreFiles) {
-                        List<AA> scores = loadScoreFile(possibleScoreFile, ScoreFormat.JSDFormat);
-                        int[][] lcs = calcLongestCommonSubSequence(
-                                chain.getAtomGroups(GroupType.AMINOACID), scores);
-                        int length = lcs[lcs.length - 1][lcs[lcs.length - 1].length - 1];
-                        if (max < length) {
-                            max = length;
-                            newScoreFile = possibleScoreFile;
-                        }
-                    }
-                    if (scoreFile != null) {
-                        scoreFiles.add(Tuple.create(newScoreFile, scoreFile.getName()));
-                    }
-                }
-            }
+            Tuple2<String, String> baseAndExt = BioUtils.removePdbExtension(pdbFile.getName());
+            Path parentDir = Paths.get(pdbFile.getParent());
+            pickScoresForFile(pdbFile).forEach(t-> {
+                String chainId = t.getItem3();
+                File scoreFile = parentDir.
+                        resolve(baseAndExt.getItem1() + chainId.toUpperCase()
+                                + baseAndExt.getItem2() + ".hom.gz")
+                        .toFile();
+                scoreFiles.add(Tuple.create(t.getItem1(), scoreFile.getName()));
+            });
         }
         return scoreFiles;
+    }
+
+    public static List<Tuple3<File, String, String>> pickScoresForFile(File pdbFile) throws
+            IOException {
+        List<Tuple3<File, String, String>> result = new ArrayList<>();
+        Structure s = BioUtils.loadPdbFile(pdbFile);
+        for (Chain chain : s.getChains()) {
+            // Skip non-protein chains.
+            if (chain.getAtomGroups(GroupType.AMINOACID).size() <= 0) continue;
+            // Try to find score for this chain.
+            Tuple2<String, String> baseAndExt = BioUtils.removePdbExtension(pdbFile.getName());
+            Path parentDir = Paths.get(pdbFile.getParent());
+            String chainId = chain.getChainID().trim().isEmpty() ? "A" : chain.getChainID();
+            File scoreFile = parentDir.
+                    resolve(baseAndExt.getItem1() + chainId.toUpperCase()
+                            + baseAndExt.getItem2() + ".hom.gz")
+                    .toFile();
+            if (scoreFile.exists()) {
+                result.add(Tuple.create(scoreFile, baseAndExt.getItem1(), chainId));
+                continue;
+            }
+            // Fallback case. Try all chains and pick the one with longest LCS.
+            File[] possibleScoreFiles = parentDir.toFile().listFiles(
+                    (File dir, String name) -> {
+                        if (name.startsWith(baseAndExt.getItem1()) && name.endsWith(".hom.gz")) {
+                            return true;
+                        }
+                        return false;
+                    });
+            int max = -1;
+            File newScoreFile = null;
+            for (File possibleScoreFile : possibleScoreFiles) {
+                List<AA> scores = loadScoreFile(possibleScoreFile, ScoreFormat.JSDFormat);
+                int[][] lcs = calcLongestCommonSubSequence(
+                        chain.getAtomGroups(GroupType.AMINOACID), scores);
+                int length = lcs[lcs.length - 1][lcs[lcs.length - 1].length - 1];
+                if (max < length) {
+                    max = length;
+                    newScoreFile = possibleScoreFile;
+                }
+            }
+            if (newScoreFile != null) {
+                result.add(Tuple.create(newScoreFile, baseAndExt.getItem1(), chainId));
+            }
+        }
+        return result;
     }
 
     private static class AA {
@@ -127,27 +136,16 @@ public class ConservationScore implements Serializable {
         return this.scores.size();
     }
 
-    public void toJson(File scoreFile) throws FileNotFoundException {
-        Utils.stringToFile((new Gson()).toJson(this), scoreFile);
-    }
-
-    public static ConservationScore fromJson(File scoreFile) throws IOException {
-        Gson gson = new Gson();
-        try (BufferedReader reader = new BufferedReader(new FileReader(scoreFile))) {
-            return gson.fromJson(reader, ConservationScore.class);
-        }
-    }
-
     public enum ScoreFormat {
         ConCavityFormat,
         JSDFormat
     }
 
-    private static List<AA> loadScoreFile(File scoreFile, ScoreFormat format) {
+    private static List<AA> loadScoreFile(File scoreFile, ScoreFormat format) throws IOException {
         TsvParserSettings settings = new TsvParserSettings();
         settings.setLineSeparatorDetectionEnabled(true);
         TsvParser parser = new TsvParser(settings);
-        List<String[]> lines = parser.parseAll(scoreFile);
+        List<String[]> lines = parser.parseAll(Utils.readFile(scoreFile));
         List<AA> result = new ArrayList<>(lines.size());
         for (String[] line : lines) {
             int index = -1;
@@ -175,7 +173,7 @@ public class ConservationScore implements Serializable {
 
     public static ConservationScore fromFiles(Structure structure,
                                               Function<String, File> scoresFiles)
-            throws FileNotFoundException {
+            throws IOException {
         return fromFiles(structure, scoresFiles, ScoreFormat.JSDFormat);
     }
 
@@ -253,7 +251,7 @@ public class ConservationScore implements Serializable {
      */
     public static ConservationScore fromFiles(Structure structure,
                                               Function<String, File> scoreFiles,
-                                              ScoreFormat format) throws FileNotFoundException {
+                                              ScoreFormat format) throws IOException {
         Map<ResidueNumberWrapper, Double> scores = new HashMap<>();
         for (Chain chain : structure.getChains()) {
             if (chain.getAtomGroups(GroupType.AMINOACID).size() <= 0) {
@@ -263,14 +261,32 @@ public class ConservationScore implements Serializable {
             chainId = chainId.trim().isEmpty() ? "A" : chainId;
             List<AA> chainScores = null;
             File scoreFile = scoreFiles.apply(chainId);
-            if (scoreFile.exists()) {
+            if (scoreFile != null && scoreFile.exists()) {
                 chainScores = ConservationScore.loadScoreFile(scoreFile, format);
             }
             if (chainScores != null) {
                 matchSequences(chain.getAtomGroups(GroupType.AMINOACID), chainScores, scores);
             }
         }
+        if (scores.isEmpty()) {
+            return null;
+        }
         return new ConservationScore(scores);
     }
 
+    public static  ConservationScore forFile(File pdbFile, ScoreFormat format) throws IOException {
+        List<Tuple3<File, String, String>> scoreFiles = ConservationScore.pickScoresForFile(pdbFile);
+        if (scoreFiles == null || scoreFiles.isEmpty()) {
+            return null;
+        }
+        Function<String, File> mappingFunction = (String chainId) -> {
+            for (final Tuple3<File, String, String> scoreFile : scoreFiles) {
+                if (scoreFile.getItem3().equals(chainId)) {
+                    return scoreFile.getItem1();
+                }
+            }
+            return null;
+        };
+        return fromFiles(BioUtils.loadPdbFile(pdbFile), mappingFunction, format);
+    }
 }

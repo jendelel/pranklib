@@ -6,16 +6,13 @@ import org.biojava.nbio.structure.io.PDBFileReader;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +20,7 @@ import java.util.function.Function;
 
 import cz.siret.prank.lib.utils.BioUtils;
 import cz.siret.prank.lib.utils.Tuple2;
+import cz.siret.prank.lib.utils.Utils;
 
 public class Main {
 
@@ -37,7 +35,16 @@ public class Main {
             switch (args[0].toLowerCase()) {
                 case "pdbtofasta":
                     try {
-                        BioUtils.dirToFasta(new File(args[1]));
+                        File argFile = new File(args[1]);
+                        if (!argFile.exists()) {
+                            System.err.println("File specified does not exists.");
+                            return;
+                        }
+                        if (argFile.isDirectory()) {
+                            BioUtils.dirToFastaFiles(argFile).forEach(System.out::println);
+                        } else {
+                            BioUtils.fileToFastaFiles(argFile).forEach(System.out::println);
+                        }
                     } catch (StructureException e) {
                         e.printStackTrace();
                     }
@@ -75,7 +82,7 @@ public class Main {
                                                            Function<String, File> scoreFnc,
                                                            ConservationScore.ScoreFormat format)
             throws IOException {
-        try (InputStream pdbIn = new FileInputStream(pdbFile)) {
+        try (InputStream pdbIn = Utils.readFile(pdbFile)) {
             PDBFileReader reader = new PDBFileReader();
             Structure s = reader.getStructure(pdbIn);
             return ConservationScore.fromFiles(s, scoreFnc, format);

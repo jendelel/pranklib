@@ -1,20 +1,24 @@
 package cz.siret.prank.lib.utils;
 
 import org.biojava.nbio.structure.Chain;
+import org.biojava.nbio.structure.GroupType;
 import org.biojava.nbio.structure.Structure;
 import org.biojava.nbio.structure.StructureException;
 import org.biojava.nbio.structure.io.PDBFileReader;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.zip.GZIPInputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class BioUtils {
 
-    public static String pdbToFasta(File pdbFile) throws IOException, StructureException {
-        return pdbToFasta(pdbFile, null);
+    public static Map<String, String> pdbToFasta(File pdbFile) throws IOException,
+            StructureException {
+        return pdbToFasta(loadPdbFile(pdbFile), null);
     }
 
     public static String chainToFasta(Chain chain, String header) {
@@ -31,51 +35,72 @@ public class BioUtils {
         return result.toString();
     }
 
-    public static String pdbToFasta(File pdbFile, String chainId) throws IOException,
-            StructureException {
+    public static Structure loadPdbFile(File pdbFile) throws IOException {
         PDBFileReader pdbReader = new PDBFileReader();
-        boolean isGzipped = pdbFile.getName().endsWith(".gz");
-        try (InputStream inputStream = isGzipped ?
-                new GZIPInputStream(new FileInputStream(pdbFile)) :
-                new FileInputStream(pdbFile)) {
+        try (InputStream inputStream = Utils.readFile(pdbFile)) {
             Structure structure = pdbReader.getStructure(inputStream);
-            StringBuilder output = new StringBuilder();
-            String header = ">" + structure.getPDBHeader().getIdCode() + ":";
-            if (chainId == null) {
-                for (Chain chain : structure.getChains()) {
-                    String chainFasta = chainToFasta(chain, header);
-                    if (chainFasta != null) {
-                        output.append(chainFasta);
-                        output.append('\n');
-                    }
-                }
-            } else {
-                Chain chain = chainId == null ?
-                        structure.getChains().get(0) :
-                        structure.getChainByPDB(chainId);
-                String chainFasta = chainToFasta(chain, header);
-                if (chainFasta != null) {
-                    output.append(chainFasta);
-                    output.append('\n');
-                }
-            }
-            return output.toString();
+            return structure;
         }
     }
 
-    public static void dirToFasta(File dir) throws IOException, StructureException {
-        File[] listOfFiles = dir.listFiles();
-
-        for (File f : listOfFiles) {
-            if (f.isFile()) {
-                if (f.getName().endsWith(".pdb")) {
-                    String newFileName = f.getName().concat(".fasta");
-                    String fastaContent = pdbToFasta(f);
-                    File newFile = new File(f.getParent(), newFileName);
-                    Utils.stringToFile(fastaContent, newFile);
+    public static Map<String, String> pdbToFasta(Structure protein, String chainId) throws
+            IOException, StructureException {
+        Map<String, String> output = new HashMap<>();
+        String header = ">" + protein.getPDBHeader().getIdCode() + ":";
+        if (chainId == null) {
+            for (Chain chain : protein.getChains()) {
+                String chId = chain.getChainID().trim().isEmpty() ? "A" : chain.getChainID();
+                if (chain.getAtomGroups(GroupType.AMINOACID).size() <= 0) continue;
+                String chainFasta = chainToFasta(chain, header);
+                if (chainFasta != null) {
+                    output.put(chId, chainFasta);
                 }
             }
+        } else {
+            Chain chain = chainId.isEmpty() ?
+                    protein.getChains().get(0) :
+                    protein.getChainByPDB(chainId);
+            String chainFasta = chainToFasta(chain, header);
+            if (chainFasta != null) {
+                output.put(chain.getChainID(), chainFasta);
+            }
         }
+        return output;
+    }
+
+    public static Tuple2<String, String> removePdbExtension(String fileName) {
+        if (fileName.endsWith(".pdb.gz") || fileName.endsWith("ent.gz")) {
+            return Tuple.create(fileName.substring(0, fileName.length() - 7),
+                    fileName.substring(fileName.length() - 7));
+        } else {
+            int dotIndex = fileName.lastIndexOf('.');
+            return Tuple.create(fileName.substring(0, dotIndex), fileName.substring(dotIndex));
+        }
+    }
+
+    public static List<String> fileToFastaFiles(File f) throws IOException, StructureException {
+        List<String> result = new ArrayList<>();
+        if (f.isFile()) {
+            Map<String, String> fastaChains = pdbToFasta(f);
+            Tuple2<String, String> baseAndExt = removePdbExtension(f.getName());
+            for (Map.Entry<String, String> chainEntry : fastaChains.entrySet()) {
+                String newFileName = baseAndExt.getItem1().concat(chainEntry.getKey())
+                        .concat(baseAndExt.getItem2()).concat(".fasta");
+                File newFile = new File(f.getParent(), newFileName);
+                Utils.stringToFile(chainEntry.getValue(), newFile);
+                result.add(newFile.getAbsolutePath());
+            }
+        }
+        return result;
+    }
+
+    public static List<String> dirToFastaFiles(File dir) throws IOException, StructureException {
+        List<String> result = new ArrayList<>();
+        File[] listOfFiles = dir.listFiles();
+        for (File f : listOfFiles) {
+            result.addAll(fileToFastaFiles(f));
+        }
+        return result;
     }
 
 
