@@ -10,8 +10,10 @@ import java.io.FileReader;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,6 +21,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 import cz.siret.prank.lib.utils.BioUtils;
+import cz.siret.prank.lib.utils.Tuple;
 import cz.siret.prank.lib.utils.Tuple2;
 import cz.siret.prank.lib.utils.Utils;
 
@@ -41,11 +44,48 @@ public class Main {
                             return;
                         }
                         if (argFile.isDirectory()) {
-                            BioUtils.dirToFastaFiles(argFile).forEach(System.out::println);
+                            BioUtils.INSTANCE.dirToFastaFiles(argFile).forEach(System.out::println);
                         } else {
-                            BioUtils.fileToFastaFiles(argFile).forEach(System.out::println);
+                            BioUtils.INSTANCE.fileToFastaFiles(argFile).forEach(System.out::println);
                         }
                     } catch (StructureException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+                case "pickscoresfromhssp":
+                    // Parameters are pdbfile, pdbId, hsspToFasta, msaToConservation, hsspDir
+                    try {
+                        ExternalTools externalTools = new ExternalTools(args[3], args[4], args[5]);
+                        Path pdbFile = Paths.get(args[1]);
+                        Structure protein = BioUtils.INSTANCE.loadPdbFile(pdbFile.toFile());
+                        Map<String, Tuple2<File, File>> scores = externalTools
+                                .getConsevationAndMSAsFromHSSP(args[2], protein);
+                        String baseName = BioUtils.INSTANCE.removePdbExtension(args[1]).getItem1();
+                        Path pdbFileParent = pdbFile.getParent();
+                        for (Map.Entry<String, Tuple2<File, File>> entry : scores.entrySet()) {
+                            Path dest = pdbFileParent.resolve(baseName.concat(entry.getKey())
+                                    .concat(".hssp.fasta"));
+                            Files.copy(Paths.get(
+                                    entry.getValue().getItem1().getAbsolutePath()), dest,
+                                    StandardCopyOption.REPLACE_EXISTING);
+                            Utils.INSTANCE.gzipAndDeleteFile(dest.toFile());
+                            dest = pdbFileParent.resolve(baseName.concat(entry.getKey())
+                                    .concat(".hssp.hom"));
+                            Files.copy(Paths.get(
+                                    entry.getValue().getItem2().getAbsolutePath()), dest,
+                                    StandardCopyOption.REPLACE_EXISTING);
+                            Utils.INSTANCE.gzipAndDeleteFile(dest.toFile());
+                        }
+                        // Delete the temp folder with MSAs and conservation files.
+                         scores.values().stream().findAny().ifPresent(entry -> {
+                             try {
+                                 Utils.INSTANCE.deleteDirRecursively(
+                                         Paths.get(entry.getItem1().getAbsolutePath()).getParent());
+                             } catch (IOException e) {
+                                 e.printStackTrace();
+                             }
+                         });
+                    } catch (IOException | InterruptedException e) {
                         e.printStackTrace();
                     }
                     break;
@@ -82,7 +122,7 @@ public class Main {
                                                            Function<String, File> scoreFnc,
                                                            ConservationScore.ScoreFormat format)
             throws IOException {
-        try (InputStream pdbIn = Utils.readFile(pdbFile)) {
+        try (InputStream pdbIn = Utils.INSTANCE.readFile(pdbFile)) {
             PDBFileReader reader = new PDBFileReader();
             Structure s = reader.getStructure(pdbIn);
             return ConservationScore.fromFiles(s, scoreFnc, format);

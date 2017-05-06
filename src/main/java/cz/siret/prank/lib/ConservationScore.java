@@ -43,7 +43,7 @@ public class ConservationScore implements Serializable {
             throws IOException, StructureException {
         List<Tuple2<File, String>> scoreFiles = new ArrayList<>(files.length);
         for (File pdbFile : files) {
-            Tuple2<String, String> baseAndExt = BioUtils.removePdbExtension(pdbFile.getName());
+            Tuple2<String, String> baseAndExt = BioUtils.INSTANCE.removePdbExtension(pdbFile.getName());
             Path parentDir = Paths.get(pdbFile.getParent());
             pickScoresForFile(pdbFile).forEach(t-> {
                 String chainId = t.getItem3();
@@ -57,15 +57,50 @@ public class ConservationScore implements Serializable {
         return scoreFiles;
     }
 
+    public static Map<String, String> pickScores(Structure protein,
+                                                 Map<String, File> conservationFiles)
+            throws IOException {
+        Map<String, String> result = new HashMap<>();
+        for (Chain chain : protein.getChains()) {
+            // Skip non-protein chains.
+            if (chain.getAtomGroups(GroupType.AMINOACID).size() <= 0) continue;
+            // Try end find score for this chain.
+            String chainId = chain.getChainID().trim().isEmpty() ? "A" : chain.getChainID();
+            File scoreFile = conservationFiles.get(chainId);
+            if (scoreFile != null && scoreFile.exists()) {
+                result.put(chainId, chainId);
+                continue;
+            }
+            // Fallback case. Try all chains and pick the one with longest LCS.
+            int max = -1;
+            String newScoreChain = null;
+            for (Map.Entry<String, File> possibleScoreFile : conservationFiles.entrySet()) {
+                List<ConservationScore.AA> scores = loadScoreFile(possibleScoreFile.getValue(),
+                        ConservationScore.ScoreFormat.JSDFormat);
+                int[][] lcs = calcLongestCommonSubSequence(
+                        chain.getAtomGroups(GroupType.AMINOACID), scores);
+                int length = lcs[lcs.length - 1][lcs[lcs.length - 1].length - 1];
+                if (max < length) {
+                    max = length;
+                    newScoreChain = possibleScoreFile.getKey();
+                }
+            }
+            if (newScoreChain != null) {
+                result.put(chainId, newScoreChain);
+            }
+        }
+        return result;
+    }
+
     public static List<Tuple3<File, String, String>> pickScoresForFile(File pdbFile) throws
             IOException {
         List<Tuple3<File, String, String>> result = new ArrayList<>();
-        Structure s = BioUtils.loadPdbFile(pdbFile);
+        Structure s = BioUtils.INSTANCE.loadPdbFile(pdbFile);
         for (Chain chain : s.getChains()) {
             // Skip non-protein chains.
             if (chain.getAtomGroups(GroupType.AMINOACID).size() <= 0) continue;
-            // Try to find score for this chain.
-            Tuple2<String, String> baseAndExt = BioUtils.removePdbExtension(pdbFile.getName());
+            // Try end find score for this chain.
+            Tuple2<String, String> baseAndExt = BioUtils.INSTANCE.removePdbExtension(pdbFile.getName());
             Path parentDir = Paths.get(pdbFile.getParent());
             String chainId = chain.getChainID().trim().isEmpty() ? "A" : chain.getChainID();
             File scoreFile = parentDir.
@@ -79,13 +114,11 @@ public class ConservationScore implements Serializable {
             // Fallback case. Try all chains and pick the one with longest LCS.
             File[] possibleScoreFiles = parentDir.toFile().listFiles(
                     (File dir, String name) -> {
-                        if (name.startsWith(baseAndExt.getItem1()) && name.endsWith(".hom.gz")) {
-                            return true;
-                        }
-                        return false;
+                        return name.startsWith(baseAndExt.getItem1()) && name.endsWith(".hom.gz");
                     });
             int max = -1;
             File newScoreFile = null;
+            assert possibleScoreFiles != null;
             for (File possibleScoreFile : possibleScoreFiles) {
                 List<AA> scores = loadScoreFile(possibleScoreFile, ScoreFormat.JSDFormat);
                 int[][] lcs = calcLongestCommonSubSequence(
@@ -145,7 +178,7 @@ public class ConservationScore implements Serializable {
         TsvParserSettings settings = new TsvParserSettings();
         settings.setLineSeparatorDetectionEnabled(true);
         TsvParser parser = new TsvParser(settings);
-        List<String[]> lines = parser.parseAll(Utils.readFile(scoreFile));
+        List<String[]> lines = parser.parseAll(Utils.INSTANCE.readFile(scoreFile));
         List<AA> result = new ArrayList<>(lines.size());
         for (String[] line : lines) {
             int index = -1;
@@ -178,9 +211,9 @@ public class ConservationScore implements Serializable {
     }
 
     /**
-     * @param chain       Chain from PDB Structure
+     * @param chain       Chain start PDB Structure
      * @param chainScores Parse conservation scores.
-     * @param outResult   Add matched scores to map (residual number -> conservation score)
+     * @param outResult   Add matched scores end map (residual number -> conservation score)
      */
     public static void matchSequences(List<Group> chain, List<AA> chainScores,
                                       Map<ResidueNumberWrapper, Double> outResult) {
@@ -199,7 +232,6 @@ public class ConservationScore implements Serializable {
 
         System.out.println("Matching chains using LCS");
         int[][] lcs = calcLongestCommonSubSequence(chain, chainScores);
-
 
         // Backtrack the actual sequence.
         int i = chain.size(), j = chainScores.size();
@@ -261,11 +293,15 @@ public class ConservationScore implements Serializable {
             chainId = chainId.trim().isEmpty() ? "A" : chainId;
             List<AA> chainScores = null;
             File scoreFile = scoreFiles.apply(chainId);
-            if (scoreFile != null && scoreFile.exists()) {
-                chainScores = ConservationScore.loadScoreFile(scoreFile, format);
-            }
-            if (chainScores != null) {
-                matchSequences(chain.getAtomGroups(GroupType.AMINOACID), chainScores, scores);
+            try {
+                if (scoreFile != null && scoreFile.exists()) {
+                    chainScores = ConservationScore.loadScoreFile(scoreFile, format);
+                }
+                if (chainScores != null) {
+                    matchSequences(chain.getAtomGroups(GroupType.AMINOACID), chainScores, scores);
+                }
+            } catch (NumberFormatException e) {
+                return null;
             }
         }
         if (scores.isEmpty()) {
@@ -287,6 +323,6 @@ public class ConservationScore implements Serializable {
             }
             return null;
         };
-        return fromFiles(BioUtils.loadPdbFile(pdbFile), mappingFunction, format);
+        return fromFiles(BioUtils.INSTANCE.loadPdbFile(pdbFile), mappingFunction, format);
     }
 }

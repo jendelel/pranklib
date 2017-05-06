@@ -24,14 +24,11 @@ task fatJar(type: Jar) {
 dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.11'
 
-    compile group: 'org.biojava', name: 'biojava-core', version: '4.2.4'
-    compile group: 'org.biojava', name: 'biojava-structure', version: '4.2.4'
-    compile 'org.biojava:biojava-alignment:4.2.4'
+    compile group: 'org.biojava', name: 'biojava-core', version: '4.2.6'
 
-    compile group: 'com.google.code.gson', name: 'gson', version: '2.8.0' // For Json serialization
     compile group: 'com.univocity', name: 'univocity-parsers', version: '2.4.0' // For parsing csv
+    compile group: 'org.apache.commons', name: 'commons-compress', version: '1.13' // bz2 decompress
 
-
-    compile group: 'org.apache.commons', name: 'commons-math3', version: '3.6.1'
     compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.22'
+    compile files('libs/biojava-structure-4.2.6-rdk1.jar')     // customized fork for pocket-rank
 }

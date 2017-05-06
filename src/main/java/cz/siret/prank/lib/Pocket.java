@@ -1,5 +1,7 @@
 package cz.siret.prank.lib;
 
+import org.biojava.nbio.structure.Structure;
+
 import java.io.InputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -16,7 +18,7 @@ public class Pocket implements Serializable {
     private float centerX;
     private float centerY;
     private float centerZ;
-    private Integer[] residueIds;
+    private String[] residueIds;
     private Integer[] surfAtomIds;
 
     public String getName() {
@@ -83,11 +85,11 @@ public class Pocket implements Serializable {
         this.centerZ = centerZ;
     }
 
-    public Integer[] getResidueIds() {
+    public String[] getResidueIds() {
         return residueIds;
     }
 
-    public void setResidueIds(Integer[] residueIds) {
+    public void setResidueIds(String[] residueIds) {
         this.residueIds = residueIds;
     }
 
@@ -117,8 +119,7 @@ public class Pocket implements Serializable {
             p.setCenterX(Float.parseFloat(tokens[5]));
             p.setCenterY(Float.parseFloat(tokens[6]));
             p.setCenterZ(Float.parseFloat(tokens[7]));
-            p.setResidueIds(Arrays.stream(tokens[8].split(" "))
-                    .map((s) -> Integer.parseInt(s)).toArray(Integer[]::new));
+            p.setResidueIds(Arrays.stream(tokens[8].split(" ")).toArray(String[]::new));
             p.setSurfAtomIds(Arrays.stream(tokens[9].split(" "))
                     .map((s) -> Integer.parseInt(s)).toArray(Integer[]::new));
             res.add(p);
