@@ -91,6 +91,7 @@ public enum Utils {
     }
 
     public void packZipArchive(ZipOutputStream outZip, File archiveToPack, String folderName) throws IOException {
+        logger.info("Packing archive []", archiveToPack.getAbsolutePath());
         if (!archiveToPack.exists()) return;
         try (ZipInputStream inZip = new ZipInputStream(new FileInputStream(archiveToPack))) {
             ZipEntry inZipEntry = inZip.getNextEntry();

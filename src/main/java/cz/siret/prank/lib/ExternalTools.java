@@ -37,21 +37,24 @@ public class ExternalTools {
     public Map<String, File> getMSAsfromHSSP(String pdbId) throws IOException,
             InterruptedException {
         // Check if the script even exists
+        logger.info("Getting MSA from HSSP for PDB: {}", pdbId);
         Map<String, File> result = new HashMap<>();
         if (hsspToFastaScript != null && hsspDir != null) {
             File scriptFile = new File(hsspToFastaScript);
             if (scriptFile.exists() && hsspDir.toFile().exists()) {
-                Path tempHsspDir = Files.createTempDirectory(pdbId.concat("_hssp"));
-                Path tempFastaDir = Files.createTempDirectory(pdbId.concat("_fasta"));
                 // Decompress HSSP files first
                 File hsspFile = hsspDir.resolve(pdbId.concat(".hssp.bz2")).toFile();
+                logger.info("Looking for {}", hsspFile.getAbsolutePath());
                 if (!hsspFile.exists()) return result;
+                Path tempHsspDir = Files.createTempDirectory(pdbId.concat("_hssp"));
+                Path tempFastaDir = Files.createTempDirectory(pdbId.concat("_fasta"));
                 try (InputStream in = new BZip2CompressorInputStream(
                         new FileInputStream(hsspFile))) {
                     Files.copy(in, tempHsspDir.resolve(pdbId.concat(".hssp")),
                             StandardCopyOption.REPLACE_EXISTING);
                 }
 
+                logger.info("Converting hssp->fasta :{}", hsspFile.getName());
                 ProcessBuilder processBuilder = new ProcessBuilder(scriptFile.getAbsolutePath(),
                         pdbId, tempHsspDir.toAbsolutePath().toString(),
                         tempFastaDir.toAbsolutePath().toString());
@@ -65,6 +68,7 @@ public class ExternalTools {
                     String name = f.getName();
                     String chainId = name.substring(pdbId.length(),
                             name.length() - ".hssp.fasta".length());
+                    logger.info("Chain: {}, file: {}", chainId, f.getAbsolutePath().toString());
                     result.put(chainId, f);
                 }
                 Utils.INSTANCE.deleteDirRecursively(tempHsspDir);
@@ -85,6 +89,7 @@ public class ExternalTools {
             File scriptFile = new File(msaToConservationScript);
             if (scriptFile.exists()) {
                 for (Map.Entry<String, File> msa : msas.entrySet()) {
+                    logger.info("Calculating conservation for chain: {}", msa.getKey());
                     ProcessBuilder processBuilder = new ProcessBuilder(scriptFile.getAbsolutePath(),
                             msa.getValue().getAbsolutePath());
                     processBuilder.directory(scriptFile.getParentFile());
@@ -109,7 +114,7 @@ public class ExternalTools {
         Map<String, File> scores = getConservationFromMSAs(msas);
         Map<String, String> chainMatching = ConservationScore.pickScores(protein, scores);
         for (Map.Entry<String, String> chainMatch : chainMatching.entrySet()) {
-            System.out.println(chainMatch.getKey() + ":" + chainMatch.getValue());
+            logger.info("Chains matched. {}->{}", chainMatch.getKey(), chainMatch.getValue());
             result.put(chainMatch.getKey(), Tuple.create(
                     msas.get(chainMatch.getValue()), scores.get(chainMatch.getValue())));
         }
