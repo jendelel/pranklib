@@ -36,11 +36,14 @@ public class ExternalTools {
 
     public Map<String, File> getMSAsfromHSSP(String pdbId) throws IOException,
             InterruptedException {
+        pdbId = pdbId.toLowerCase();
         // Check if the script even exists
         logger.info("Getting MSA from HSSP for PDB: {}", pdbId);
         Map<String, File> result = new HashMap<>();
         if (hsspToFastaScript != null && hsspDir != null) {
             File scriptFile = new File(hsspToFastaScript);
+            logger.info(scriptFile.getAbsolutePath());
+            logger.info(hsspDir.toString());
             if (scriptFile.exists() && hsspDir.toFile().exists()) {
                 // Decompress HSSP files first
                 File hsspFile = hsspDir.resolve(pdbId.concat(".hssp.bz2")).toFile();
