@@ -121,7 +121,6 @@ public enum BioUtils {
             logger.info("Copying file: {} -> {}", sourceFile.toAbsolutePath().toString(),
                     msaFile.toAbsolutePath().toString());
             Files.copy(sourceFile, msaFile, StandardCopyOption.REPLACE_EXISTING);
-            sourceFile.toFile().delete();
             Utils.INSTANCE.gzipAndDeleteFile(msaFile.toFile());
 
             Path scoreFile = destDir.resolve(baseName.concat(entry.getKey()).concat(".hom"));
@@ -129,11 +128,15 @@ public enum BioUtils {
             logger.info("Copying file: {} -> {}", sourceFile.toAbsolutePath().toString(),
                     scoreFile.toAbsolutePath().toString());
             Files.copy(sourceFile, scoreFile, StandardCopyOption.REPLACE_EXISTING);
-            sourceFile.toFile().delete();
             Utils.INSTANCE.gzipAndDeleteFile(scoreFile.toFile());
 
             result.put(entry.getKey(), Tuple.create(msaFile.toFile(), scoreFile.toFile()));
         }
+        for (final Tuple2<File, File> files : conservationAndMSAs.values()) {
+            files.getItem1().delete();
+            files.getItem2().delete();
+        }
+
         return result;
     }
 
