@@ -14,7 +14,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import cz.siret.prank.lib.utils.Tuple;
@@ -42,8 +41,6 @@ public class ExternalTools {
         Map<String, File> result = new HashMap<>();
         if (hsspToFastaScript != null && hsspDir != null) {
             File scriptFile = new File(hsspToFastaScript);
-            logger.info(scriptFile.getAbsolutePath());
-            logger.info(hsspDir.toString());
             if (scriptFile.exists() && hsspDir.toFile().exists()) {
                 // Decompress HSSP files first
                 File hsspFile = hsspDir.resolve(pdbId.concat(".hssp.bz2")).toFile();
@@ -71,13 +68,13 @@ public class ExternalTools {
                     String name = f.getName();
                     String chainId = name.substring(pdbId.length(),
                             name.length() - ".hssp.fasta".length());
-                    logger.info("Chain: {}, file: {}", chainId, f.getAbsolutePath().toString());
-                    result.put(chainId, f);
+                    File tempFile = File.createTempFile("msa", ".fasta");
+                    Files.move(f.toPath(), tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    logger.info("Chain: {}, file: {}", chainId, tempFile.getAbsolutePath());
+                    result.put(chainId, tempFile);
                 }
                 Utils.INSTANCE.deleteDirRecursively(tempHsspDir);
-                if (files.length == 0 || result.size() == 0) {
-                    Utils.INSTANCE.deleteDirRecursively(tempFastaDir);
-                }
+                Utils.INSTANCE.deleteDirRecursively(tempFastaDir);
             }
         }
         return result;

@@ -117,17 +117,19 @@ public enum BioUtils {
         Map<String, Tuple2<File, File>> result = new HashMap<>();
         for (final Map.Entry<String, Tuple2<File, File>> entry : conservationAndMSAs.entrySet()) {
             Path msaFile = destDir.resolve(baseName.concat(entry.getKey()).concat(".fasta"));
-            Path sourceFile = Paths.get(entry.getValue().getItem1().getAbsolutePath());
+            Path sourceFile = entry.getValue().getItem1().toPath();
             logger.info("Copying file: {} -> {}", sourceFile.toAbsolutePath().toString(),
                     msaFile.toAbsolutePath().toString());
             Files.copy(sourceFile, msaFile, StandardCopyOption.REPLACE_EXISTING);
+            sourceFile.toFile().delete();
             Utils.INSTANCE.gzipAndDeleteFile(msaFile.toFile());
 
             Path scoreFile = destDir.resolve(baseName.concat(entry.getKey()).concat(".hom"));
-            sourceFile = Paths.get(entry.getValue().getItem2().getAbsolutePath());
+            sourceFile = entry.getValue().getItem2().toPath();
             logger.info("Copying file: {} -> {}", sourceFile.toAbsolutePath().toString(),
                     scoreFile.toAbsolutePath().toString());
             Files.copy(sourceFile, scoreFile, StandardCopyOption.REPLACE_EXISTING);
+            sourceFile.toFile().delete();
             Utils.INSTANCE.gzipAndDeleteFile(scoreFile.toFile());
 
             result.put(entry.getKey(), Tuple.create(msaFile.toFile(), scoreFile.toFile()));
