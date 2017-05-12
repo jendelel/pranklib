@@ -140,4 +140,13 @@ public enum BioUtils {
         return result;
     }
 
+    public int getProteinSize(Structure protein) {
+        int resCount = 0;
+        for (final Chain chain : protein.getChains()) {
+            if (chain.getAtomGroups(GroupType.AMINOACID).size() <= 0) continue;
+            resCount += chain.getAtomGroups(GroupType.AMINOACID).size();
+        }
+        return resCount;
+    }
+
 }

@@ -62,6 +62,9 @@ public class Main {
                                 .getConsevationAndMSAsFromHSSP(args[2], protein);
                         String baseName = BioUtils.INSTANCE.removePdbExtension(args[1]).getItem1();
                         Path pdbFileParent = pdbFile.getParent();
+                        if (scores.size() <= 0) {
+                            System.exit(1);
+                        }
                         for (Map.Entry<String, Tuple2<File, File>> entry : scores.entrySet()) {
                             Path dest = pdbFileParent.resolve(baseName.concat(entry.getKey())
                                     .concat(".hssp.fasta"));
@@ -76,17 +79,14 @@ public class Main {
                                     StandardCopyOption.REPLACE_EXISTING);
                             Utils.INSTANCE.gzipAndDeleteFile(dest.toFile());
                         }
-                        // Delete the temp folder with MSAs and conservation files.
-                         scores.values().stream().findAny().ifPresent(entry -> {
-                             try {
-                                 Utils.INSTANCE.deleteDirRecursively(
-                                         Paths.get(entry.getItem1().getAbsolutePath()).getParent());
-                             } catch (IOException e) {
-                                 e.printStackTrace();
-                             }
+                        // Delete the temp files with MSAs and conservation files.
+                         scores.values().stream().forEach(files -> {
+                             files.getItem1().delete();
+                             files.getItem2().delete();
                          });
                     } catch (IOException | InterruptedException e) {
                         e.printStackTrace();
+                        System.exit(1);
                     }
                     break;
                 case "pickscores":
@@ -112,6 +112,10 @@ public class Main {
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
+                case "getproteinsize":
+                    System.out.println(BioUtils.INSTANCE.getProteinSize(
+                            BioUtils.INSTANCE.loadPdbFile(new File(args[1]))));
+                    break;
             }
         } catch (IOException e) {
             e.printStackTrace();
