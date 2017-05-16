@@ -96,7 +96,7 @@ public enum BioUtils {
                 String newFileName = baseAndExt.getItem1().concat(chainEntry.getKey())
                         .concat(baseAndExt.getItem2()).concat(".fasta");
                 File newFile = new File(f.getParent(), newFileName);
-                Utils.INSTANCE.stringToFile(chainEntry.getValue(), newFile);
+                Utils.INSTANCE.stringToFile(chainEntry.getValue(), newFile, false, false);
                 result.add(newFile.getAbsolutePath());
             }
         }
@@ -147,6 +147,22 @@ public enum BioUtils {
             resCount += chain.getAtomGroups(GroupType.AMINOACID).size();
         }
         return resCount;
+    }
+
+    public String checkForPdbFileErrors(File pdbFile) {
+        try {
+            Structure protein = loadPdbFile(pdbFile);
+            boolean hasAminoChains = false;
+            for (Chain chain : protein.getChains()) {
+                if (chain.getAtomGroups(GroupType.AMINOACID).size() > 0) {
+                    hasAminoChains = true;
+                    break;
+                }
+            }
+            return hasAminoChains ? null : "The PDB file does not contain any proteins.";
+        } catch (Exception e) {
+            return "Failed to load PDB file. ".concat(e.toString());
+        }
     }
 
 }

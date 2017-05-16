@@ -114,14 +114,23 @@ public enum Utils {
 
     // http://stackoverflow.com/questions/309424/read-convert-an-inputstream-to-a-string
     // The stream is not closed.
-    public String convertStreamToString(InputStream is) {
+    public String convertStreamToString(InputStream is, boolean close) {
         Scanner s = new Scanner(is).useDelimiter("\\A");
-        return s.hasNext() ? s.next() : "";
+        String res = s.hasNext() ? s.next() : "";
+        if (close) {
+            s.close();
+        }
+        return res;
     }
 
-    public void stringToFile(String content, File destination) throws FileNotFoundException {
-        PrintWriter writer = new PrintWriter(destination);
-        writer.print(content);
+    public void stringToFile(String content, File destination, boolean append, boolean newline)
+            throws FileNotFoundException {
+        PrintWriter writer = new PrintWriter(new FileOutputStream(destination, append));
+        if (newline) {
+            writer.println(content);
+        } else {
+            writer.print(content);
+        }
         writer.close();
     }
 

@@ -30,7 +30,7 @@ public class ExternalTools {
     public ExternalTools(String hsspToFastaScript, String msaToConservationScript, String hsspDir) {
         this.hsspToFastaScript = hsspToFastaScript;
         this.msaToConservationScript = msaToConservationScript;
-        this.hsspDir = Paths.get(hsspDir);
+        this.hsspDir = hsspDir != null ? Paths.get(hsspDir) : null;
     }
 
     public Map<String, File> getMSAsfromHSSP(String pdbId) throws IOException,
