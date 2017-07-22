@@ -94,7 +94,7 @@ public enum BioUtils {
             Tuple2<String, String> baseAndExt = removePdbExtension(f.getName());
             for (Map.Entry<String, String> chainEntry : fastaChains.entrySet()) {
                 String newFileName = baseAndExt.getItem1().concat(chainEntry.getKey())
-                        .concat(baseAndExt.getItem2()).concat(".fasta");
+                        .concat(baseAndExt.getItem2()).concat(".seq.fasta");
                 File newFile = new File(f.getParent(), newFileName);
                 Utils.INSTANCE.stringToFile(chainEntry.getValue(), newFile, false, false);
                 result.add(newFile.getAbsolutePath());

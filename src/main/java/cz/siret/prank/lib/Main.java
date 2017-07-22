@@ -67,13 +67,13 @@ public class Main {
                         }
                         for (Map.Entry<String, Tuple2<File, File>> entry : scores.entrySet()) {
                             Path dest = pdbFileParent.resolve(baseName.concat(entry.getKey())
-                                    .concat(".hssp.fasta"));
+                                    .concat(".fasta"));
                             Files.copy(Paths.get(
                                     entry.getValue().getItem1().getAbsolutePath()), dest,
                                     StandardCopyOption.REPLACE_EXISTING);
                             Utils.INSTANCE.gzipAndDeleteFile(dest.toFile());
                             dest = pdbFileParent.resolve(baseName.concat(entry.getKey())
-                                    .concat(".hssp.hom"));
+                                    .concat(".hom"));
                             Files.copy(Paths.get(
                                     entry.getValue().getItem2().getAbsolutePath()), dest,
                                     StandardCopyOption.REPLACE_EXISTING);
