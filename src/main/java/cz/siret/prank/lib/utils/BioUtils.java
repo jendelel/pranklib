@@ -112,6 +112,7 @@ public enum BioUtils {
         return result;
     }
 
+    public static final String CONSERVATION_FILENAME_PATTERN = "%baseName%.%chainID%.%ext%";
     public Map<String, Tuple2<File, File>> copyAndGzipConservationAndMSAsToDir(
             Map<String, Tuple2<File, File>> conservationAndMSAs, String baseName, Path destDir) throws IOException {
         Map<String, Tuple2<File, File>> result = new HashMap<>();
