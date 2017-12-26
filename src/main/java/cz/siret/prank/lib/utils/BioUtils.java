@@ -160,7 +160,7 @@ public enum BioUtils {
                     break;
                 }
             }
-            return hasAminoChains ? null : "The PDB file does not contain any proteins.";
+            return hasAminoChains ? null : "The PDB file does not contain any protein structure.";
         } catch (Exception e) {
             return "Failed to load PDB file. ".concat(e.toString());
         }
