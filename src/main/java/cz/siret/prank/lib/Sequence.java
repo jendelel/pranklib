@@ -114,7 +114,7 @@ public class Sequence implements Serializable {
                     if (score != null && score.size() > 0) {
                         conservationScores.add(score.getScoreForResidue(resNum));
                     }
-                    indices.add(resNum.getResNum().getSeqNum().toString().concat(insCode));
+                    indices.add(resNum.getResNum().printFull());
                     if (bindingSites != null && bindingSites.contains(resNum)) {
                         sites.add(indices.size()-1);
                     }
