@@ -4,6 +4,7 @@ import org.biojava.nbio.structure.Chain;
 import org.biojava.nbio.structure.GroupType;
 import org.biojava.nbio.structure.Structure;
 import org.biojava.nbio.structure.StructureException;
+import org.biojava.nbio.structure.io.FileConvert;
 import org.biojava.nbio.structure.io.PDBFileReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.StringBuilder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -19,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public enum BioUtils {
     INSTANCE;
@@ -148,6 +151,17 @@ public enum BioUtils {
             resCount += chain.getAtomGroups(GroupType.AMINOACID).size();
         }
         return resCount;
+    }
+
+    public String getChainsPDB(File pdbFile, Set<String> chains) throws StructureException, IOException {
+        Structure protein = loadPdbFile(pdbFile);
+        FileConvert fileConvert = new FileConvert(protein);
+        StringBuilder pdbBuilder = new StringBuilder();
+        for (String chainId : chains) {
+            Chain chain = protein.findChain(chainId);
+            pdbBuilder.append(fileConvert.toPDB(chain));
+        }
+        return pdbBuilder.toString();
     }
 
     public String checkForPdbFileErrors(File pdbFile) {

@@ -125,13 +125,22 @@ public enum Utils {
 
     public void stringToFile(String content, File destination, boolean append, boolean newline)
             throws FileNotFoundException {
-        PrintWriter writer = new PrintWriter(new FileOutputStream(destination, append));
-        if (newline) {
-            writer.println(content);
-        } else {
-            writer.print(content);
+        try(PrintWriter writer = new PrintWriter(new FileOutputStream(destination, append))) {
+            if (newline) {
+                writer.println(content);
+            } else {
+                writer.print(content);
+            }
         }
-        writer.close();
+    }
+
+    public void stringToGZipFile(String content, File destination)
+            throws IOException {
+        try (OutputStream stream = new GZIPOutputStream(new FileOutputStream(destination))) {
+            try (PrintWriter writer = new PrintWriter(stream)) {
+                writer.print(content);
+            }
+        }
     }
 
     // http://stackoverflow.com/questions/340209/generate-colors-between-red-and-green-for-a-power-meter
